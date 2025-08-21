@@ -34,5 +34,15 @@ jobs:
         python -m pip install --upgrade pip wheel setuptools
         if (Test-Path requirements.txt) { pip install -r requirements.txt --ignore-installed }
 
-    - name: Start ngrok tunnel
-      run: .\ngrok\ngrok.exe tcp 3389
+    - name: Start ngrok tunnel and show RDP address
+      shell: pwsh
+      run: |
+        Start-Process -NoNewWindow -FilePath .\ngrok\ngrok.exe -ArgumentList "tcp 3389" 
+        Start-Sleep -Seconds 10
+        $tunnel = (Invoke-RestMethod -Uri http://127.0.0.1:4040/api/tunnels).tunnels[0].public_url
+        Write-Host "====================================="
+        Write-Host "RDP Address: $tunnel"
+        Write-Host "Username: runneradmin"
+        Write-Host "Password: @cyb3rking"
+        Write-Host "====================================="
+        while ($true) { Start-Sleep -Seconds 600 }
