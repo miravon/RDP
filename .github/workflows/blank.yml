@@ -1,54 +1,27 @@
-name: Arch KDE RDP
+name: Window 10
 
 on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Host runner, Arch runs in container if needed
+
+    runs-on: windows-latest
     timeout-minutes: 9999
 
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Pull Arch Linux Docker image
-      run: docker pull archlinux:latest
-
-    - name: Run Arch container with KDE, xrdp, ngrok
-      run: |
-        docker run --rm -it \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace \
-          --name arch_kde_rdp \
-          archlinux:latest /bin/bash -c "
-            # Update system
-            pacman -Sy --noconfirm sudo base-devel xorg plasma xorg-xinit xrdp wget tar git &&
-            
-            # Install Python and pip
-            pacman -Sy --noconfirm python python-pip &&
-            python -m pip install --upgrade pip wheel setuptools &&
-            
-            # Install Python requirements except uvloop
-            if [ -f requirements.txt ]; then
-              grep -v uvloop requirements.txt | xargs -n 1 pip install
-            fi &&
-            
-            # Download and setup ngrok
-            wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -O ngrok.tgz &&
-            mkdir -p ngrok &&
-            tar -xvzf ngrok.tgz -C ngrok &&
-            ./ngrok/ngrok authtoken $NGROK_AUTH_TOKEN &&
-            
-            # Create RDP user
-            useradd -m hongkong || true &&
-            echo 'hongkong:kingkong' | chpasswd &&
-            
-            # Enable and start xrdp and KDE
-            systemctl enable xrdp &&
-            systemctl start xrdp &&
-            
-            # Start ngrok tunnel
-            ./ngrok/ngrok tcp 3389
-          "
+    - name: Download
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+    - name: Extract
+      run: Expand-Archive ngrok.zip
+    - name: Auth
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+    - name: Enable TS
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
+    - run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+    - run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+    - run: Set-LocalUser -Name "hongkong" -Password (ConvertTo-SecureString -AsPlainText "kingkong" -Force)
+    - name: Create Tunnel
+      run: .\ngrok\ngrok.exe tcp 3389
