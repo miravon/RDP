@@ -11,13 +11,24 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Upgrade pip
+      run: python -m pip install --upgrade pip wheel setuptools
+
+    - name: Install requirements (skip uvloop)
+      run: |
+        if (Test-Path requirements.txt) {
+          # Install everything except uvloop
+          $reqs = Get-Content requirements.txt | Where-Object {$_ -notmatch "uvloop"}
+          $reqs | ForEach-Object { pip install $_ }
+        }
+
     - name: Download ngrok
       run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
 
     - name: Extract ngrok
       run: Expand-Archive ngrok.zip
 
-    - name: Auth ngrok
+    - name: Authenticate ngrok
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
@@ -29,10 +40,5 @@ jobs:
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
         Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@cyb3rking" -Force)
 
-    - name: Install pip requirements
-      run: |
-        python -m pip install --upgrade pip wheel setuptools
-        if (Test-Path requirements.txt) { pip install -r requirements.txt --ignore-installed }
-
-    - name: Start ngrok tunnel (blocks job)
+    - name: Start ngrok tunnel (block job)
       run: .\ngrok\ngrok.exe tcp 3389
